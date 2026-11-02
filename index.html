@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Загрузка видео</title>
+  </head>
+  <body>
+    <h1>Загрузка видео</h1>
+
+    <section>
+      <h2>Загрузить по ссылке</h2>
+      <form action="/upload-by-url" method="POST">
+        <input type="text" name="url" placeholder="https://..." required>
+        <button type="submit">Сохранить по ссылке</button>
+      </form>
+    </section>
+
+    <hr>
+
+    <section>
+      <h2>Загрузить файлом</h2>
+      <form action="/upload-file" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">Загрузить файл</button>
+      </form>
+    </section>
+
+    <div id="result"></div>
+
+    <hr>
+    <h2>Загруженные видео</h2>
+    <div id="video-list"></div>
+
+    <script>
+      async function handleForm(event, type) {
+        event.preventDefault();
+        const form = event.target;
+        const data = new FormData(form);
+
+        let res;
+        if (type === 'url') {
+          const url = data.get('url');
+          res = await fetch('/upload-by-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'url=' + encodeURIComponent(url)
+          });
+        } else {
+          res = await fetch('/upload-file', {
+            method: 'POST',
+            body: data
+          });
+        }
+
+        if (!res.ok) {
+          const errText = await res.text();
+          alert('Ошибка: ' + errText);
+          return;
+        }
+        const json = await res.json();
+
+        const div = document.getElementById('result');
+        div.innerHTML = `
+          <p>Видео сохранено. ID: ${json.id}</p>
+          <a href="${json.get_url}">
+            <button>Смотреть видео</button>
+          </a>
+        `;
+        
+        loadVideos();
+      }
+
+      document.querySelector('form[action="/upload-by-url"]').addEventListener('submit', e => handleForm(e, 'url'));
+      document.querySelector('form[action="/upload-file"]').addEventListener('submit', e => handleForm(e, 'file'));
+
+      async function loadVideos() {
+        try {
+          const res = await fetch('/list');
+          if (!res.ok) throw new Error('Не удалось загрузить список: ' + await res.text());
+          const videos = await res.json();
+          
+          const list = document.getElementById('video-list');
+          if (videos.length === 0) {
+            list.innerHTML = '<p>Пока нет загруженных видео.</p>';
+            return;
+          }
+          
+          list.innerHTML = videos.map(v => `
+            <div style="margin-bottom: 10px;">
+              <a href="${v.get_url}">
+                <button>${v.file_name}</button>
+              </a>
+            </div>
+          `).join('');
+        } catch (e) {
+          console.error(e);
+          document.getElementById('video-list').innerHTML = '<p style="color:red">Ошибка загрузки списка</p>';
+        }
+      }
+
+      loadVideos();
+    </script>
+  </body>
+</html>
